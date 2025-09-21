@@ -134,7 +134,7 @@ impl App {
         Ok(())
     }
 
-    fn build_status_lines(&self) -> Vec<Line> {
+    fn build_status_lines(&self) -> Vec<Line<'_>> {
         let mut res = Vec::<Line>::with_capacity(4);
 
         // Get about information from the service content
