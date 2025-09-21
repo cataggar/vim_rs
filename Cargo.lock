@@ -181,9 +181,9 @@ checksum = "2fd1289c04a9ea8cb22300a459a72a385d7c73d3259e2ed7dcb2af674838cfa9"
 
 [[package]]
 name = "check_keyword"
-version = "0.3.1"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3678a4fc14c47dce76127d66f9b2637ff497af665d5618f1f756f4ad1b4a5b1"
+checksum = "0dcba1e35fcf6c9350d9fb4863d87c66e5e37f1583f883560dca2c9320840bcc"
 dependencies = [
  "phf",
 ]
