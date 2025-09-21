@@ -26,17 +26,44 @@ displays the VMs in a terminal window using the Ratatui library.
 ## Installation
 
 Ensure you have Rust 1.85 installed. Then set the following environment variables:
-- `VIM_SERVER` - FQDN of a vCenter server (version 8.0.2 or later).
+
+- `VIM_SERVER` - Server address of a vCenter server or simulator (version 8.0.2 or later). Can include protocol (`http://` or `https://`). If no protocol is specified, defaults to HTTPS.
 - `VIM_USERNAME` - Username for vCenter authentication.
 - `VIM_PASSWORD` - Password for vCenter authentication.
-- `VIM_INSECURE` - Set to `true` to ignore SSL certificate validation (not recommended for production).
+- `VIM_INSECURE` - Set to `true` to ignore SSL certificate validation for HTTPS connections (not recommended for production).
 - `LOG_LEVEL` - Set to `debug` or `trace` for verbose logging (optional).
 
 ## Usage
 
-To run vTUI, run the following command:
+Set the required environment variables and run vTUI:
 
-```bash
+**PowerShell (with vcsim):**
+
+```powershell
+$env:VIM_SERVER = "http://localhost:8989"
+$env:VIM_USERNAME = "user"
+$env:VIM_PASSWORD = "pass"
+cargo run --bin vtui
+```
+
+**Nu Shell (with vcsim):**
+
+```nu
+$env.VIM_SERVER = "http://localhost:8989"
+$env.VIM_USERNAME = "user"
+$env.VIM_PASSWORD = "pass"
+$env.LOG_LEVEL = "trace"
+$env.HTTP_PROXY = "http://127.0.0.1:8080" # Optional proxy to see usage
+cargo run --bin vtui
+```
+
+**For real vCenter (HTTPS):**
+
+```powershell
+$env:VIM_SERVER = "vcenter.example.com"
+$env:VIM_USERNAME = "administrator@vsphere.local"
+$env:VIM_PASSWORD = "your-password"
+$env:VIM_INSECURE = "true"  # Only if using self-signed certificates
 cargo run --bin vtui
 ```
 

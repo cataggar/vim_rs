@@ -4,6 +4,7 @@ pub mod pc_helpers;
 pub mod pc_cache;
 pub mod pc_retrieve;
 mod root_objects;
+mod soap_fallback;
 
 pub use client::Client;
 pub use client::ClientBuilder;

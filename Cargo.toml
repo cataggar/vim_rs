@@ -8,6 +8,9 @@ members = [
     "examples/snippets",
     "examples/utils",
     "examples/vtui",
+    "examples/session_examples",
+    "examples/govmoni_hosts",
+    "examples/vcsim_service_content",
 ]
 resolver = "2"
 

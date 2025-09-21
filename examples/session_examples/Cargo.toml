@@ -1,0 +1,18 @@
+[package]
+name = "session_examples"
+version.workspace = true
+edition = "2021"
+
+[[bin]]
+name = "property_collector_session"
+path = "src/property_collector_session.rs"
+
+[[bin]]
+name = "session_manager"
+path = "src/session_manager.rs"
+
+[dependencies]
+vim_rs = { path = "../../vim_rs" }
+anyhow.workspace = true
+tokio = { workspace = true, features = ["full"] }
+env_logger.workspace = true

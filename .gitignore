@@ -2,3 +2,5 @@
 .vscode
 examples/perf_metrics/src/vim
 .idea
+*.log
+*.req

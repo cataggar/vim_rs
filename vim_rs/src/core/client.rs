@@ -8,6 +8,7 @@ use log::Level::Trace;
 use std::ffi::OsStr;
 use crate::mo;
 use crate::types::structs::{ManagedObjectReference, ServiceContent};
+use crate::core::soap_fallback;
 
 const LIB_NAME: &str = env!("CARGO_PKG_NAME");
 const LIB_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -54,12 +55,14 @@ pub struct ClientBuilder {
     user_name: Option<String>,
     password: Option<String>,
     locale: Option<String>,
+    skip_hello: bool,
+    simulator: bool,
 }
 
 impl ClientBuilder {
     /// Create a new client builder for a VI/JSON API at given FQDN or IP address
     ///
-    /// * `server_address` - vCenter server FQDN or IP address
+    /// * `server_address` - vCenter server FQDN or IP address, optionally with protocol (http:// or https://)
     pub fn new(server_address: &str) -> Self {
         Self {
             server_address: server_address.to_string(),
@@ -72,6 +75,21 @@ impl ClientBuilder {
             user_name: None,
             password: None,
             locale: None,
+            skip_hello: false,
+            simulator: false,
+        }
+    }
+
+    /// Parse the server address to extract protocol and host
+    /// Returns (protocol, host) where protocol is "http" or "https"
+    fn parse_server_address(&self) -> (String, String) {
+        if self.server_address.starts_with("http://") {
+            ("http".to_string(), self.server_address[7..].to_string())
+        } else if self.server_address.starts_with("https://") {
+            ("https".to_string(), self.server_address[8..].to_string())
+        } else {
+            // Default to https for backward compatibility
+            ("https".to_string(), self.server_address.clone())
         }
     }
 
@@ -145,8 +163,19 @@ impl ClientBuilder {
         self
     }
 
+    /// Skip calling the vCenter "Hello System" API. This provides parity with tools (like govmomi)
+    /// that directly target a specific release endpoint without negotiating. When skipped and no
+    /// explicit api_release() is provided, the default API_RELEASE constant is used.
+    pub fn skip_hello(mut self, skip: bool) -> Self {
+        self.skip_hello = skip;
+        self
+    }
+
     /// Build the client instance
     pub async fn build(self) -> Result<Arc<Client>> {
+        // Parse protocol and host from server address before self is moved
+        let (protocol, host) = self.parse_server_address();
+        
         let http_client = match self.http_client {
             Some(client) => client,
             None => {
@@ -163,34 +192,73 @@ impl ClientBuilder {
         let user_agent = user_agent(self.app_name.as_deref(), self.app_version.as_deref());
 
         // Negotiate the API release if not set
+        let mut simulator_detected = false;
         let api_release = match self.api_release {
             Some(release) => release,
+            None if self.skip_hello => {
+                let release = API_RELEASE.to_string();
+                debug!("skip_hello set: using default API_RELEASE {release}");
+                release
+            },
             None => {
                 let releases = self.compatible_api_releases
                     .unwrap_or_else(|| COMPATIBLE_API_RELEASES.iter().map(|s| s.to_string()).collect());
-                let spec = HelloSpec {
-                    api_releases: &releases,
-                };
-                let path = format!("https://{}/api/vcenter/system?action=hello", self.server_address);
+                let spec = HelloSpec { api_releases: &releases };
+                let path = format!("{}://{}/api/vcenter/system?action=hello", protocol, host);
                 let req = http_client.post(&path)
                     .header("Content-Type", "application/json")
                     .header("User-Agent", &user_agent)
                     .json(&spec);
-                let res = req.send().await?;
-                let res = res.error_for_status()?;
-                let result: HelloResult = res.json().await?;
-                let api_release = result.api_release;
-                // Throw error if api_release is empty string indicating no compatible API release
-                // was found.
-                if api_release.is_empty() {
-                    return Err(Error::CannotNegotiateAPIRelease(releases));
+                match req.send().await {
+                    Ok(res) => {
+                        if res.status() == reqwest::StatusCode::NOT_FOUND {
+                            // Potential simulator (vcsim) – try to detect via versions XML
+                            let versions_url = format!("{}://{}/sdk/vimServiceVersions.xml", protocol, host);
+                            match http_client.get(&versions_url).send().await {
+                                Ok(vres) if vres.status().is_success() => {
+                                    warn!("Hello endpoint 404 and versions XML reachable – assuming simulator; using default API_RELEASE {}", API_RELEASE);
+                                    simulator_detected = true;
+                                    API_RELEASE.to_string()
+                                },
+                                _ => {
+                                    warn!("Hello 404 and versions XML not accessible – falling back to default API_RELEASE {}", API_RELEASE);
+                                    API_RELEASE.to_string()
+                                }
+                            }
+                        } else {
+                            match res.error_for_status() {
+                                Ok(ok) => {
+                                    match ok.json::<HelloResult>().await {
+                                        Ok(result) => {
+                                            let api_release = result.api_release;
+                                            if api_release.is_empty() {
+                                                return Err(Error::CannotNegotiateAPIRelease(releases));
+                                            }
+                                            debug!("Negotiated API release: {}", api_release);
+                                            api_release
+                                        },
+                                        Err(e) => {
+                                            warn!("Hello response parse failed: {}. Falling back to first compatible.", e);
+                                            releases.first().cloned().unwrap_or_else(|| API_RELEASE.to_string())
+                                        }
+                                    }
+                                },
+                                Err(e) => {
+                                    warn!("Hello negotiation failed: {}. Falling back to default API_RELEASE.", e);
+                                    API_RELEASE.to_string()
+                                }
+                            }
+                        }
+                    },
+                    Err(e) => {
+                        warn!("Hello request error: {}. Using default API_RELEASE.", e);
+                        API_RELEASE.to_string()
+                    }
                 }
-                debug!("Negotiated API release: {}", api_release);
-                api_release
-            },
+            }
         };
 
-        let base_url = format!("https://{}/sdk/vim25/{}", self.server_address, api_release);
+        let base_url = format!("{}://{}/sdk/vim25/{}", protocol, host, api_release);
 
         let bootstrap = Arc::new(Client {
             http_client: http_client.clone(),
@@ -199,10 +267,24 @@ impl ClientBuilder {
             base_url: base_url.clone(),
             user_agent: user_agent.clone(),
             service_content: None,
+            simulator: simulator_detected,
         });
 
-        let service_instance = mo::ServiceInstance::new(bootstrap.clone(), SERVICE_INSTANCE_MOID);
-        let content = service_instance.content().await?;
+        let content = if simulator_detected {
+            // SOAP fallback to construct minimal service content
+            match soap_fallback::retrieve_service_content(&http_client, &base_url).await {
+                Ok(c) => c,
+                Err(e) => {
+                    warn!("SOAP fallback failed: {}", e);
+                    // Attempt JSON path regardless (may still fail)
+                    let service_instance = mo::ServiceInstance::new(bootstrap.clone(), SERVICE_INSTANCE_MOID);
+                    service_instance.content().await?
+                }
+            }
+        } else {
+            let service_instance = mo::ServiceInstance::new(bootstrap.clone(), SERVICE_INSTANCE_MOID);
+            service_instance.content().await?
+        };
         debug!("ServiceInstance content obtained from: {}", content.about.full_name);
         trace!("ServiceInstance content: {:?}", content);
 
@@ -214,6 +296,7 @@ impl ClientBuilder {
             base_url: base_url.clone(),
             user_agent: user_agent.clone(),
             service_content: Some(content),
+            simulator: simulator_detected,
         });
 
 
@@ -233,6 +316,7 @@ pub struct Client {
     base_url: String,
     user_agent: String,
     service_content: Option<ServiceContent>,
+    simulator: bool,
 }
 
 /// Client for the VI JSON API that handles basic HTTP requests and authentication headers.
@@ -256,6 +340,9 @@ impl Client {
     pub fn api_release(&self) -> String {
         self.api_release.clone()
     }
+
+    /// Returns true if the client detected a simulator (vcsim) environment.
+    pub fn is_simulator(&self) -> bool { self.simulator }
 
     /// Fetch a managed object property by name into user provided type. This method can be used
     /// with ['serde_json::Value'] to fetch the property as a dynamic JSON value. This enables
