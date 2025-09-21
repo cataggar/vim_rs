@@ -4,17 +4,17 @@ version = "0.1.2"
 edition = "2024"
 
 [dependencies]
-anyhow = "1.0"
-crossterm = {  version = "0.28", features = ["event-stream"]}
-futures = "0.3"
+anyhow.workspace = true
+crossterm.workspace = true
+futures.workspace = true
 tokio.workspace = true
-ratatui = {  version = "0.29" , features = ["crossterm"]}
+ratatui.workspace = true
 vim_rs.workspace = true
 vim_macros.workspace = true
-chrono = "0.4"
-tui-tree-widget = "0.23"
+chrono.workspace = true
+tui-tree-widget.workspace = true
 serde_json.workspace = true
 log.workspace = true
-simplelog = "0.12"
+simplelog.workspace = true
 indexmap.workspace = true
 thiserror.workspace = true

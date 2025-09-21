@@ -24,10 +24,10 @@ name = "retrieve_recent_task"
 path = "src/retrieve_recent_task.rs"
 
 [dependencies]
-anyhow = "1.0"
+anyhow.workspace = true
 env_logger.workspace = true
 tokio.workspace = true
 utils = { version = "0.1.0", path = "../utils" }
-vim_rs = { version = "0.2", path = "../../vim_rs" }
-vim_macros = { version = "0.2", path = "../../vim_macros" }
-log = "0.4.27"
+vim_rs.workspace = true
+vim_macros.workspace = true
+log.workspace = true

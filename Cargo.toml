@@ -44,6 +44,18 @@ convert_case = "0.8"
 check_keyword = "0.3"
 phf_codegen = "0.11"
 
+# UI and CLI dependencies
+anyhow = "1.0"
+chrono = "0.4"
+crossterm = { version = "0.28", features = ["event-stream"] }
+futures = "0.3"
+ratatui = { version = "0.29", features = ["crossterm"] }
+simplelog = "0.12"
+tui-tree-widget = "0.23"
+
+# Build dependencies
+rustc_version = "0.4"
+
 # Internal dependencies
 vim_rs = { path = "vim_rs" }
 vim_macros = { path = "vim_macros" }
