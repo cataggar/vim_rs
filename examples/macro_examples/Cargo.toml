@@ -25,8 +25,8 @@ path = "src/retrieve_recent_task.rs"
 
 [dependencies]
 anyhow = "1.0"
-env_logger = "0.11"
-tokio = {  version = "1.44", features = ["macros"]}
+env_logger.workspace = true
+tokio.workspace = true
 utils = { version = "0.1.0", path = "../utils" }
 vim_rs = { version = "0.2", path = "../../vim_rs" }
 vim_macros = { version = "0.2", path = "../../vim_macros" }

@@ -5,5 +5,5 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0"
-log = "0.4"
-vim_rs = { version = "0.2", path = "../../vim_rs" }
+log.workspace = true
+vim_rs.workspace = true

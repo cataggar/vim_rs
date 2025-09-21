@@ -1,11 +1,1 @@
-[workspace]
-members = [ "macro_examples","snippets", "utils", "vtui"]
-resolver = "2"
-
-[profile.release]
-lto = "fat"
-strip = true
-opt-level = "z"
-codegen-units = 1
-panic = "abort"
-debug = false
+# This file is kept for compatibility but the workspace is now defined at the repository root
